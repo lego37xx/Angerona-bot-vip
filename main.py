@@ -6,7 +6,7 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 # --- ⚙️ CONFIGURACIÓN CRÍTICA ---
-TOKEN = '8616684285:AAEF271duWSPV0-UfJ9rK4rUdI6UQz1-Zxg'
+TOKEN = '8616684285:AAFyPoA2cKvB1lDVONjH49iOtBDUMzn6L1k'
 DUENO_ID = 8650569384
 ID_GRUPO_FIJO = -1003519088233
 NOMBRE_FOTO = 'logo.png'
