@@ -2,90 +2,109 @@ import os
 import logging
 import threading
 from flask import Flask
-from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, ChatJoinRequestHandler
 
-# --- ⚙️ CONFIGURACIÓN CRÍTICA ---
+# --- ⚙️ CONFIGURACIÓN ---
 TOKEN = '8616684285:AAH4NBmcFs-ZTnUvIRhLMkahBcf49i0tBDUMzn6L1k'
 DUENO_ID = 8650569384
 ID_GRUPO_FIJO = -1003519088233
 NOMBRE_FOTO = 'logo.png'
 PALABRAS_PROHIBIDAS = ["gore", "cp", "zoofilia", "estafa", "hacker", "spam"]
 
-# Diccionario para advertencias {user_id: cantidad_warns}
-warns_usuario = {}
+# Diccionario temporal para guardar quién pidió entrar {user_id: chat_id}
+solicitudes_pendientes = {}
 
-# --- 🚀 SERVIDOR PARA RENDER ---
 web_app = Flask('')
-
 @web_app.route('/')
-def home():
-    return "Angerona está patrullando con éxito. 🛡️"
+def home(): return "Angerona: Portería Automática Activa. 🛡️"
 
 def run_flask():
     port = int(os.environ.get("PORT", 10000))
     web_app.run(host='0.0.0.0', port=port)
 
-# --- 🛡️ FUNCIONES DEL BOT ---
+# --- 🛡️ FUNCIONES ---
+
+async def manejar_solicitud(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Recibe la solicitud y manda el botón de verificación al privado"""
+    request = update.chat_join_request
+    user = request.from_user
+    chat_id = request.chat.id
+    
+    # Guardamos la solicitud en memoria
+    solicitudes_pendientes[user.id] = chat_id
+    
+    keyboard = [[InlineKeyboardButton("✅ Verificarme para Entrar", url=f"https://t.me/{(await context.bot.get_me()).username}?start=verificar")]]
+    
+    try:
+        await context.bot.send_message(
+            chat_id=user.id,
+            text=(
+                f"🛡️ *SISTEMA DE SEGURIDAD ANGERONA*\n\n"
+                f"Hola {user.first_name}, has solicitado entrar al grupo.\n"
+                "Para ser aceptado automáticamente, toca el botón de abajo y dale a 'Iniciar'."
+            ),
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode='Markdown'
+        )
+    except:
+        # Si tiene el privado cerrado, no podemos enviarle el link
+        pass
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Bienvenida profesional"""
-    mensaje = (
-        "🛡️ *¡Hola! Soy Angerona, la guardiana de este grupo* 🛡️\n\n"
-        "Para mantener la seguridad, envía tu **presentación**:\n"
-        "📸 *Foto*\n"
-        "👤 *Nombre*\n"
-        "🎂 *Edad*\n"
-        "🌎 *País*\n\n"
-        "⚠️ _Si no cumples las reglas, tomaré medidas._"
-    )
-    try:
-        with open(NOMBRE_FOTO, 'rb') as photo:
-            await context.bot.send_photo(chat_id=update.effective_chat.id, photo=photo, caption=mensaje, parse_mode='Markdown')
-    except:
-        await context.bot.send_message(chat_id=update.effective_chat.id, text=mensaje, parse_mode='Markdown')
-
-async def unwarn(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Comando /unwarn - Solo para el dueño"""
-    if update.effective_user.id != DUENO_ID:
-        return
-
-    # Si respondes a un mensaje de alguien: /unwarn
-    if update.message.reply_to_message:
-        target_user = update.message.reply_to_message.from_user
-        warns_usuario[target_user.id] = 0
-        await update.message.reply_text(f"✅ *Advertencias limpiadas* para {target_user.first_name}. ¡Estás libre!")
+    """Maneja la verificación y aprueba al usuario"""
+    user = update.effective_user
+    args = context.args
+    
+    if args and args[0] == "verificar":
+        if user.id in solicitudes_pendientes:
+            group_id = solicitudes_pendientes[user.id]
+            try:
+                # --- 🔑 ACCIÓN MAESTRA: EL BOT APRUEBA AL USUARIO ---
+                await context.bot.approve_chat_join_request(chat_id=group_id, user_id=user.id)
+                
+                await update.message.reply_text("✅ *¡Verificado!* He aprobado tu solicitud. Ya puedes entrar al grupo.")
+                
+                # Limpiamos de memoria
+                del solicitudes_pendientes[user.id]
+                
+            except Exception as e:
+                await update.message.reply_text("❌ Hubo un error al aprobarte. Avisa a un administrador.")
+        else:
+            await update.message.reply_text("ℹ️ No tienes solicitudes pendientes o ya fuiste aprobado.")
     else:
-        # Si lo usas tú solo, te limpia a ti mismo
-        warns_usuario[update.effective_user.id] = 0
-        await update.message.reply_text("✅ *Tus advertencias han sido borradas*, Luis. ¡Limpio!")
+        # Mensaje de reglas normal
+        mensaje_reglas = "🛡️ *REGLAS DEL GRUPO*\n\n📸 Foto\n👤 Nombre\n🎂 Edad\n🌎 País\n\n_Presentación obligatoria al entrar._"
+        try:
+            with open(NOMBRE_FOTO, 'rb') as photo:
+                await context.bot.send_photo(chat_id=update.effective_chat.id, photo=photo, caption=mensaje_reglas, parse_mode='Markdown')
+        except:
+            await update.message.reply_text(mensaje_reglas, parse_mode='Markdown')
+
+async def bienvenida_grupo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Saludo automático cuando el usuario entra tras ser aprobado"""
+    for member in update.message.new_chat_members:
+        if member.id == context.bot.id: continue
+        
+        await update.message.reply_text(
+            f"🎊 ¡Bienvenido {member.first_name}! Angerona te ha permitido el acceso.\n\n"
+            "⚠️ *TIENES 5 MINUTOS* para enviar tu presentación completa (Foto, Nombre, Edad, País) o serás removido.",
+            parse_mode='Markdown'
+        )
+
+async def enviar_reglas_periodicas(context: ContextTypes.DEFAULT_TYPE):
+    await context.bot.send_message(chat_id=ID_GRUPO_FIJO, text="📢 *REGLAS:* La presentación es obligatoria para permanecer.", parse_mode='Markdown')
 
 async def filtro_mensajes(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Vigila palabras prohibidas y aplica warns llamativos"""
-    if not update.message or not update.message.text:
-        return
-
+    if not update.message or not update.message.text: return
     user = update.effective_user
-    texto = update.message.text.lower()
-
-    if any(palabra in texto for palabra in PALABRAS_PROHIBIDAS):
-        user_id = user.id
-        warns_usuario[user_id] = warns_usuario.get(user_id, 0) + 1
-        count = warns_usuario[user_id]
-        
-        if count >= 3:
-            await context.bot.ban_chat_member(chat_id=update.effective_chat.id, user_id=user_id)
-            await update.message.reply_text(f"🚫 *USUARIO ELIMINADO*\n\n{user.first_name} ha sido baneado por acumular 3 advertencias.")
+    if any(p in update.message.text.lower() for p in PALABRAS_PROHIBIDAS):
+        warns_usuario[user.id] = warns_usuario.get(user.id, 0) + 1
+        if warns_usuario[user.id] >= 3:
+            await context.bot.ban_chat_member(ID_GRUPO_FIJO, user.id)
+            await update.message.reply_text(f"🚫 {user.first_name} baneado.")
         else:
-            # Mensaje de advertencia más visual
-            aviso = (
-                f"⚠️ *¡ADVERTENCIA PARA {user.first_name.upper()}!* ⚠️\n\n"
-                f"Has usado una palabra prohibida. Esto no está permitido.\n"
-                f"🚩 Contador: *{count}/3*\n\n"
-                f" _Al llegar a 3 serás expulsado automáticamente._"
-            )
-            await update.message.reply_text(aviso, parse_mode='Markdown')
-        
+            await update.message.reply_text(f"⚠️ {user.first_name}, palabra prohibida ({warns_usuario[user.id]}/3)")
         await update.message.delete()
 
 # --- 🕹️ EJECUCIÓN ---
@@ -93,16 +112,17 @@ async def filtro_mensajes(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     application = Application.builder().token(TOKEN).build()
     
-    # Comandos
+    application.add_handler(ChatJoinRequestHandler(manejar_solicitud))
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("unwarn", unwarn)) # NUEVO COMANDO
-    
-    # Filtro
+    application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, bienvenida_grupo))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, filtro_mensajes))
     
+    if application.job_queue:
+        application.job_queue.run_repeating(enviar_reglas_periodicas, interval=21600, first=10)
+
     application.run_polling()
 
 if __name__ == '__main__':
     threading.Thread(target=run_flask, daemon=True).start()
     main()
-    
+            
