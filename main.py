@@ -96,7 +96,15 @@ def main():
     application.run_polling()
 
 if __name__ == '__main__':
-    # Esto permite que Flask corra en un hilo separado si fuera necesario, 
-    # pero para Render usaremos el polling directo por ahora.
+    # --- BLOQUE PARA ENGAÑAR A RENDER (EVITA EL PORT TIMEOUT) ---
+    import threading
+    # Usamos el puerto que Render nos asigna o el 10000 por defecto
+    port = int(os.environ.get("PORT", 10000))
+    # Arrancamos el servidor web en un hilo separado
+    threading.Thread(target=lambda: web_app.run(host='0.0.0.0', port=port), daemon=True).start()
+    
+    # --- INICIO DEL BOT DE TELEGRAM ---
+    print("Iniciando patrullaje de Angerona...")
     main()
+
             
