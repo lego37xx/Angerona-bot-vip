@@ -6,7 +6,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, ChatJoinRequestHandler
 
 # --- ⚙️ CONFIGURACIÓN ---
-TOKEN = '8616684285:AAH4NBmcFs-ZTnUvIRhLMkahBcf49i0tBDUMzn6L1k' 
+TOKEN = '8616684285:AAFBtFppXJZJrQJ7LAjqMF9yYDYPb_ePKxk' 
 DUENO_ID = 8650569384
 ID_GRUPO_FIJO = -1003519088233
 NOMBRE_FOTO = 'logo.png'
