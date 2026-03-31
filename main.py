@@ -103,7 +103,7 @@ async def boton_aprobar(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"👤 **Nombre:**\n"
             f"🎂 **Edad:**\n"
             f"🌎 **País:**\n\n"
-            f"🛡️ _¡Si no cumples con las reglas o la presentación, Angerona tomará medidas\!_"
+            f"🛡️ _¡Si no cumples con las reglas o la presentación, Angerona tomará medidas!_"
         )
         # Puedes subir una imagen llamada 'bienvenida.png' a tu proyecto para que se vea mejor
         await context.bot.send_message(chat_id=int(d[1]), text=presentacion, parse_mode='MarkdownV2')
@@ -115,7 +115,7 @@ if __name__ == '__main__':
     while True:
         try:
             app = ApplicationBuilder().token(TOKEN).build()
-            app.job_queue.run_repeating(enviar_reglas, interval=1200, first=10)
+            # app.job_queue.run_repeating(enviar_reglas, interval=1200, first=10)
             app.add_handler(ChatJoinRequestHandler(manejar_solicitud))
             app.add_handler(CallbackQueryHandler(boton_aprobar, pattern="^apr_"))
             app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), filtro_seguridad))
