@@ -4,7 +4,7 @@ from flask import Flask
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, ChatJoinRequestHandler
 
-# --- ⚙️ CONFIGURACIÓN (Token: 8616684285:AAHQkeJfOVlv11o2M14bgwU1Q3UMzHpPjVE) ---
+# --- ⚙️ CONFIGURACIÓN ---
 TOKEN = '8616684285:AAHQkeJfOVlv11o2M14bgwU1Q3UMzHpPjVE' 
 ID_GRUPO_FIJO = -1003519088233
 NOMBRE_FOTO = 'logo.png'
@@ -40,12 +40,7 @@ async def manejar_solicitud(update: Update, context: ContextTypes.DEFAULT_TYPE):
     solicitudes_pendientes[user.id] = request.chat.id
     keyboard = [[InlineKeyboardButton("✅ Iniciar Verificación", url=f"https://t.me/{(await context.bot.get_me()).username}?start=verificar")]]
     try:
-        await context.bot.send_message(
-            chat_id=user.id, 
-            text=f"🛡️ *ACCESO A VALIENDO MADRES*\n\nHola {user.first_name}, para entrar al grupo debes verificar que eres una persona real.",
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode='Markdown'
-        )
+        await context.bot.send_message(chat_id=user.id, text=f"🛡️ Hola {user.first_name}, verifícate para entrar.", reply_markup=InlineKeyboardMarkup(keyboard))
     except: pass
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -53,18 +48,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.args and context.args[0] == "verificar":
         if user.id in solicitudes_pendientes:
             await context.bot.approve_chat_join_request(chat_id=solicitudes_pendientes[user.id], user_id=user.id)
-            await update.message.reply_text("✅ *Acceso aprobado.* ¡Bienvenido al desmadre!")
+            await update.message.reply_text("✅ *Acceso aprobado.*")
             del solicitudes_pendientes[user.id]
     else:
         await update.message.reply_text(REGLAS_TEXTO, parse_mode='Markdown')
 
 async def bienvenida_grupo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Detecta nuevos miembros y pide presentación."""
     for member in update.message.new_chat_members:
         if member.id == context.bot.id: continue
         mensaje = (
-            f"✨ *¡BIENVENIDO/A AL GRUPO, {member.first_name.upper()}!* ✨\n\n"
-            "Para evitar ser removido, envía tu **presentación formal** ahora mismo:\n\n"
+            f"✨ *¡BIENVENIDO/A, {member.first_name.upper()}!* ✨\n\n"
+            "Envía tu **presentación formal** para evitar ser removido:\n"
             "📸 *Foto* | 👤 *Nombre* | 🎂 *Edad* | 🌎 *País*"
         )
         try:
@@ -73,12 +67,18 @@ async def bienvenida_grupo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except:
             await context.bot.send_message(chat_id=update.effective_chat.id, text=mensaje, parse_mode='Markdown')
 
-async def enviar_reglas_periodicas(context: ContextTypes.DEFAULT_TYPE):
+async def enviar_reglas_callback(context: ContextTypes.DEFAULT_TYPE):
     try:
         with open(NOMBRE_FOTO, 'rb') as photo:
             await context.bot.send_photo(chat_id=ID_GRUPO_FIJO, photo=photo, caption=REGLAS_TEXTO, parse_mode='Markdown')
     except:
         await context.bot.send_message(chat_id=ID_GRUPO_FIJO, text=REGLAS_TEXTO, parse_mode='Markdown')
+
+async def activar_reloj(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Comando manual para activar las reglas cada 2 horas sin crashear el inicio."""
+    if update.effective_user.id == 8650569384: # Solo tú puedes activarlo
+        context.job_queue.run_repeating(enviar_reglas_callback, interval=7200, first=10)
+        await update.message.reply_text("✅ *Reloj de reglas activado correctamente.*")
 
 async def filtro_mensajes(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message and update.message.text:
@@ -90,20 +90,10 @@ async def filtro_mensajes(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     application = Application.builder().token(TOKEN).build()
     
-    # Handlers
     application.add_handler(ChatJoinRequestHandler(manejar_solicitud))
     application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("reloj", activar_reloj)) # NUEVO COMANDO
     application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, bienvenida_grupo))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, filtro_mensajes))
 
-    # Reglas cada 2 horas
-    if application.job_queue:
-        application.job_queue.run_repeating(enviar_reglas_periodicas, interval=7200, first=15)
-
-    print("🤖 Angerona en línea y protegiendo el grupo...")
-    application.run_polling(drop_pending_updates=True)
-
-if __name__ == '__main__':
-    threading.Thread(target=run_flask, daemon=True).start()
-    main()
-    
+    print("🤖 Angerona
