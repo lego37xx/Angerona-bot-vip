@@ -1,18 +1,18 @@
 import os
 import logging
 import threading
+import time
 from flask import Flask
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, ChatJoinRequestHandler
 
 # --- ⚙️ CONFIGURACIÓN ---
-TOKEN = '8616684285:AAFe2aI_OHCMkqTgoQRZMP-VkF5_Www-xP0' 
+TOKEN = '8616684285:AAHfSOA3yOtzAXlMfl0Exbhp6n2QyLMJzhc' 
 DUENO_ID = 8650569384
 ID_GRUPO_FIJO = -1003519088233
 NOMBRE_FOTO = 'logo.png'
 PALABRAS_PROHIBIDAS = ["gore", "cp", "zoofilia", "estafa", "hacker", "spam"]
 
-# Texto de reglas centralizado para evitar errores
 REGLAS_TEXTO = (
     "📜🔥 *REGLAS OFICIALES – “VALIENDO MADRES”* 🔥📜\n\n"
     "1️⃣ 🚫 Prohibido menores de edad\n"
@@ -36,7 +36,7 @@ def run_flask():
     port = int(os.environ.get("PORT", 10000))
     web_app.run(host='0.0.0.0', port=port)
 
-# --- 🛡️ FUNCIONES DE MODERACIÓN ---
+# --- 🛡️ FUNCIONES ---
 
 async def manejar_solicitud(update: Update, context: ContextTypes.DEFAULT_TYPE):
     request = update.chat_join_request
@@ -61,7 +61,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("✅ *Acceso Aprobado.* ¡Ya puedes entrar a Valiendo Madres!")
             del solicitudes_pendientes[user.id]
     else:
-        # Comando manual para ver reglas en privado o grupo
         try:
             with open(NOMBRE_FOTO, 'rb') as photo:
                 await context.bot.send_photo(chat_id=update.effective_chat.id, photo=photo, caption=REGLAS_TEXTO, parse_mode='Markdown')
@@ -80,12 +79,11 @@ async def bienvenida_grupo(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await context.bot.send_photo(chat_id=update.effective_chat.id, photo=photo, caption=bienvenida, parse_mode='Markdown')
         except: await update.message.reply_text(bienvenida, parse_mode='Markdown')
 
-# --- ⏰ FUNCIÓN AUTOMÁTICA (CRITICAL FIX) ---
 async def enviar_reglas_periodicas(context: ContextTypes.DEFAULT_TYPE):
     try:
         with open(NOMBRE_FOTO, 'rb') as photo:
             await context.bot.send_photo(chat_id=ID_GRUPO_FIJO, photo=photo, caption=REGLAS_TEXTO, parse_mode='Markdown')
-            print("📅 Reglas enviadas automáticamente con éxito.")
+            print("📅 Reglas automáticas enviadas con éxito.")
     except Exception as e:
         print(f"❌ Error en JobQueue: {e}")
         await context.bot.send_message(chat_id=ID_GRUPO_FIJO, text=REGLAS_TEXTO, parse_mode='Markdown')
@@ -95,7 +93,6 @@ async def filtro_mensajes(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat_id = update.effective_chat.id
     
-    # Inmunidad Admins y Dueño
     try:
         member = await context.bot.get_chat_member(chat_id, user.id)
         if member.status in ['administrator', 'creator'] or user.id == DUENO_ID: return
@@ -114,36 +111,28 @@ async def filtro_mensajes(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # --- 🚀 INICIALIZACIÓN ---
 
 def main():
+    # Construcción robusta de la aplicación
     application = Application.builder().token(TOKEN).build()
     
-    # 1. Agregar Handlers
+    # Handlers
     application.add_handler(ChatJoinRequestHandler(manejar_solicitud))
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, bienvenida_grupo))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, filtro_mensajes))
     
-    # 2. Configurar REGLAS AUTOMÁTICAS antes del polling
+    # Configurar el reloj (JobQueue) antes de arrancar
     if application.job_queue:
-        application.job_queue.run_repeating(enviar_reglas_periodicas, interval=60, first=5)
-        print("✅ JobQueue configurado: Reglas cada 2 horas.")
+        # Probaremos con 60 segundos para confirmar el éxito de inmediato
+        application.job_queue.run_repeating(enviar_reglas_periodicas, interval=60, first=10)
+        print("✅ JobQueue activo: El motor de reglas ha iniciado.")
 
-    # 3. Lanzar el Bot
+    # Iniciar bot limpiando actualizaciones pendientes
     print("🤖 Angerona en guardia permanente...")
-    application.run_polling()
+    application.run_polling(drop_pending_updates=True)
 
 if __name__ == '__main__':
-    # Iniciar Flask en un hilo aparte
+    # Lanzar servidor Flask en hilo separado
     threading.Thread(target=run_flask, daemon=True).start()
+    # Pausa técnica de seguridad
+    time.sleep(2)
     main()
-        
-if __name__ == '__main__':
-    # Forzamos a que Flask corra en el hilo principal y el bot en uno separado
-    # o simplemente iniciamos el bot después de un pequeño delay
-    t = threading.Thread(target=run_flask)
-    t.daemon = True
-    t.start()
-    
-    import time
-    time.sleep(5) # Pausa de seguridad para evitar colisiones al arrancar
-    main()
-        
