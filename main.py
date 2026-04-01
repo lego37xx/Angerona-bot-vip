@@ -3,26 +3,29 @@ import asyncio
 import threading
 from flask import Flask
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes, ChatJoinRequestHandler
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes, ChatJoinRequestHandler, CallbackQueryHandler
 
-# --- ⚙️ CONFIGURACIÓN ---
+# --- ⚙️ CONFIGURACIÓN MAESTRA ---
 TOKEN = '8616684285:AAHQkeJfOVlv11o2M14bgwU1Q3UMzHpPjVE'
-NOMBRE_FOTO = 'logo.png'  # Asegúrate de que el archivo se llame así en GitHub
+DUENO_ID = 8650569384
+ID_GRUPO_FIJO = -1003519088233
+URL_LOGO = "https://raw.githubusercontent.com/lego37xx/Angerona-bot-vip/main/logo.png"
 
-# --- 🌐 WEB SERVER (Para que Render marque "Live" al instante) ---
+PALABRAS_PROHIBIDAS = ["gore", "cp", "zoofilia", "estafa", "hacker", "spam"]
+auditoria_secreta = [] 
+warns_usuario = {}
+
+# --- 🌐 WEB SERVER (Para Render) ---
 web_app = Flask('')
-
 @web_app.route('/')
-def home():
-    return "Angerona Bot Online 🛡️", 200
+def home(): return "🛡️ Angerona Stealth VIP Online", 200
 
 def run_flask():
-    # Render asigna el puerto automáticamente, por defecto 10000
     port = int(os.environ.get("PORT", 10000))
     web_app.run(host='0.0.0.0', port=port)
 
-# --- 📜 TEXTOS OFICIALES ---
-REGLAS_OFICIALES = (
+# --- 📜 REGLAS OFICIALES ---
+REGLAS_TEXTO = (
     "📜🔥 *REGLAS OFICIALES – “VALIENDO MADRES”* 🔥📜\n\n"
     "1️⃣ 🚫 *Prohibido menores de edad*\n"
     "2️⃣ 🤝 *Respeto ante todo*\n"
@@ -30,97 +33,89 @@ REGLAS_OFICIALES = (
     "4️⃣ 🚫 *Cero contenido ilegal o enfermizo*\n"
     "5️⃣ 😂 *Aquí se viene a convivir*\n"
     "6️⃣ 🔥 *Se vale picar… pero no pasarse*\n\n"
-    "⚠️ *PRESENTACIÓN OBLIGATORIA:* Foto, Nombre, Edad y País."
+    "⚠️ *PRESENTACIÓN OBLIGATORIA:* Foto, Nombre, Edad y País.\n"
+    "🛡️ _Sistema de advertencias activo (3 warns = BAN)_"
 )
 
-solicitudes_pendientes = {}
-
-# --- 🛡️ FUNCIONES DEL BOT ---
+# --- 🛡️ FUNCIONES ---
 
 async def manejar_solicitud(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Recibe la solicitud de unión y envía link de verificación al privado."""
-    request = update.chat_join_request
-    user = request.from_user
-    solicitudes_pendientes[user.id] = request.chat.id
-    
-    keyboard = [[InlineKeyboardButton("✅ ¡Verificarme!", url=f"https://t.me/{(await context.bot.get_me()).username}?start=verificar")]]
-    
+    req = update.chat_join_request
+    user = req.from_user
+    kbd = [[InlineKeyboardButton("✅ ACEPTO LAS REGLAS", callback_data=f"adm_{user.id}")]]
     try:
         await context.bot.send_message(
-            chat_id=user.id, 
-            text=f"👋 *¡Hola {user.first_name}!* \n\nPara entrar al grupo, toca el botón de abajo para verificar que no eres un bot. 👇",
-            reply_markup=InlineKeyboardMarkup(keyboard),
+            chat_id=user.id,
+            text=f"👋 ¡Hola {user.first_name}! Para entrar a *{req.chat.title}*, confirma que leíste las reglas:\n\n{REGLAS_TEXTO}",
+            reply_markup=InlineKeyboardMarkup(kbd),
             parse_mode='Markdown'
         )
-    except:
-        pass # El usuario tiene el privado cerrado
+    except: pass
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Maneja el comando /start y la aprobación de usuarios."""
+async def boton_aprobar(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    user_id = int(query.data.split("_")[1])
+    try:
+        await context.bot.approve_chat_join_request(chat_id=ID_GRUPO_FIJO, user_id=user_id)
+        await query.edit_message_text("✅ *ACCESO CONCEDIDO.* ¡Ya puedes entrar!", parse_mode='Markdown')
+        
+        bienvenida = (f"🥳 *¡BIENVENIDO/A A LA FAMILIA!* 🥳\n\n{REGLAS_TEXTO}\n\n"
+                      "✨ *Envía tu presentación ahora (Foto, Nombre, Edad y País).*")
+        await context.bot.send_photo(chat_id=ID_GRUPO_FIJO, photo=URL_LOGO, caption=bienvenida, parse_mode='Markdown')
+    except: pass
+
+async def monitor_silencioso(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.text: return
     user = update.effective_user
-    if context.args and context.args[0] == "verificar":
-        if user.id in solicitudes_pendientes:
-            await context.bot.approve_chat_join_request(chat_id=solicitudes_pendientes[user.id], user_id=user.id)
-            await update.message.reply_text("✨ *¡Aprobado!* Ya puedes entrar al grupo. ¡No olvides presentarte con la banda! 🥳")
-            del solicitudes_pendientes[user.id]
-    else:
-        await update.message.reply_text(REGLAS_OFICIALES, parse_mode='Markdown')
+    texto = update.message.text
+    
+    # Auditoría (Solo tú la ves con /auditoria)
+    log = f"👤 {user.first_name} ({user.id}): {texto}"
+    auditoria_secreta.append(log)
+    if len(auditoria_secreta) > 50: auditoria_secreta.pop(0)
 
-async def bienvenida_grupo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Envía el logo y las reglas cuando alguien entra oficialmente al grupo."""
-    for member in update.message.new_chat_members:
-        if member.id == context.bot.id: continue
-        
-        texto_bienvenida = (
-            f"🥳 *¡BIENVENIDO/A A LA FAMILIA, {member.first_name.upper()}!* 🥳\n\n"
-            f"{REGLAS_OFICIALES}\n\n"
-            "✨ *¡Queremos conocerte! Envía tu presentación ahora mismo.*"
-        )
-        
-        try:
-            # Intentamos enviar el logo con el texto
-            with open(NOMBRE_FOTO, 'rb') as f:
-                await context.bot.send_photo(
-                    chat_id=update.effective_chat.id, 
-                    photo=f, 
-                    caption=texto_bienvenida, 
-                    parse_mode='Markdown'
-                )
-        except Exception as e:
-            # Si falla la foto (ej. no está en el repo), mandamos solo el texto
-            print(f"Error al enviar foto: {e}")
-            await context.bot.send_message(
-                chat_id=update.effective_chat.id, 
-                text=texto_bienvenida, 
-                parse_mode='Markdown'
-            )
+    # Filtro
+    if any(p in texto.lower() for p in PALABRAS_PROHIBIDAS):
+        await update.message.delete()
+        warns_usuario[user.id] = warns_usuario.get(user.id, 0) + 1
+        if warns_usuario[user.id] >= 3:
+            await context.bot.ban_chat_member(chat_id=ID_GRUPO_FIJO, user_id=user_id)
+            await context.bot.send_message(chat_id=ID_GRUPO_FIJO, text=f"🚫 *BAN:* {user.first_name} expulsado.")
+        else:
+            await context.bot.send_message(chat_id=ID_GRUPO_FIJO, text=f"⚠️ {user.first_name}, mensaje eliminado. Warn: {warns_usuario[user.id]}/3")
 
-# --- 🚀 MOTOR ASÍNCRONO ---
+async def comando_auditoria(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != DUENO_ID: return
+    if not auditoria_secreta:
+        await update.message.reply_text("📭 Vacía.")
+        return
+    reporte = "📋 *AUDITORÍA PRIVADA:*\n\n" + "\n".join(auditoria_secreta)
+    await update.message.reply_text(reporte[:4000], parse_mode='Markdown')
+
+async def comando_unwarn(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != DUENO_ID or not update.message.reply_to_message: return
+    target = update.message.reply_to_message.from_user
+    warns_usuario[target.id] = max(0, warns_usuario.get(target.id, 0) - 1)
+    await update.message.reply_text(f"✅ Warn quitado a {target.first_name}.")
+
+# --- 🚀 ARRANQUE ---
 
 async def run_bot():
-    # Application sin job_queue para evitar errores de memoria 'weak reference'
     app = ApplicationBuilder().token(TOKEN).build()
-    
-    # Handlers
     app.add_handler(ChatJoinRequestHandler(manejar_solicitud))
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, bienvenida_grupo))
+    app.add_handler(CallbackQueryHandler(boton_aprobar, pattern="^adm_"))
+    app.add_handler(CommandHandler("auditoria", comando_auditoria))
+    app.add_handler(CommandHandler("unwarn", comando_unwarn))
+    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), monitor_silencioso))
     
     async with app:
         await app.initialize()
         await app.start()
-        print("🤖 Bot Angerona iniciado y listo.")
         await app.updater.start_polling(drop_pending_updates=True)
-        # Mantenemos el bucle vivo
-        while True:
-            await asyncio.sleep(3600)
+        while True: await asyncio.sleep(3600)
 
 if __name__ == '__main__':
-    # 1. Lanzamos Flask en un hilo aparte para que Render detecte el puerto 10000
     threading.Thread(target=run_flask, daemon=True).start()
-    
-    # 2. Corremos el bot en el bucle principal asíncrono
     try:
         asyncio.run(run_bot())
-    except (KeyboardInterrupt, SystemExit):
-        pass
+    except (KeyboardInterrupt, SystemExit): pass
