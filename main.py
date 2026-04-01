@@ -17,22 +17,20 @@ def home():
     return "Angerona Online 🛡️", 200
 
 def run_flask():
-    # Render usa el puerto 10000 por defecto si no detecta PORT
     port = int(os.environ.get("PORT", 10000))
     web_app.run(host='0.0.0.0', port=port)
 
 # --- 🛡️ LÓGICA DEL BOT ---
 
-REGLAS_TEXTO = (
-    "❤️ *¡BIENVENIDOS A VALIENDO MADRES!* ❤️\n\n"
-    "Normas de nuestra familia:\n"
-    "1️⃣ 🔞 Solo adultos.\n"
-    "2️⃣ 🤝 Respeto total.\n"
-    "3️⃣ 📵 Nada de DM sin permiso.\n"
-    "4️⃣ 🚫 Cero contenido ilegal.\n"
-    "5️⃣ 😂 Buena vibra.\n"
-    "6️⃣ 🔥 Relajo con respeto.\n\n"
-    "✨ *DINÁMICA:* Preséntate con **Foto, Nombre, Edad y País**."
+REGLAS_OFICIALES = (
+    "📜🔥 *REGLAS OFICIALES – “VALIENDO MADRES”* 🔥📜\n\n"
+    "1️⃣ 🚫 *Prohibido menores de edad*\n"
+    "2️⃣ 🤝 *Respeto ante todo*\n"
+    "3️⃣ 📵 *Nada de privados sin permiso*\n"
+    "4️⃣ 🚫 *Cero contenido ilegal o enfermizo*\n"
+    "5️⃣ 😂 *Aquí se viene a convivir*\n"
+    "6️⃣ 🔥 *Se vale picar… pero no pasarse*\n\n"
+    "⚠️ *PRESENTACIÓN OBLIGATORIA:* Foto, Nombre, Edad y País."
 )
 
 solicitudes_pendientes = {}
@@ -42,8 +40,14 @@ async def manejar_solicitud(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = request.from_user
     solicitudes_pendientes[user.id] = request.chat.id
     keyboard = [[InlineKeyboardButton("✅ ¡Verificarme!", url=f"https://t.me/{(await context.bot.get_me()).username}?start=verificar")]]
+    
     try:
-        await context.bot.send_message(chat_id=user.id, text=f"👋 ¡Hola {user.first_name}! Toca abajo para entrar.", reply_markup=InlineKeyboardMarkup(keyboard))
+        await context.bot.send_message(
+            chat_id=user.id, 
+            text=f"👋 *¡Hola {user.first_name}!* \n\nPara entrar al grupo, toca el botón de abajo. 👇",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode='Markdown'
+        )
     except: pass
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -51,25 +55,30 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.args and context.args[0] == "verificar":
         if user.id in solicitudes_pendientes:
             await context.bot.approve_chat_join_request(chat_id=solicitudes_pendientes[user.id], user_id=user.id)
-            await update.message.reply_text("✨ ¡Aprobado! Ya puedes entrar al grupo.")
+            await update.message.reply_text("✨ *¡Aprobado!* Ya puedes entrar al grupo. ¡No olvides presentarte! 🥳")
             del solicitudes_pendientes[user.id]
     else:
-        await update.message.reply_text(REGLAS_TEXTO, parse_mode='Markdown')
+        await update.message.reply_text(REGLAS_OFICIALES, parse_mode='Markdown')
 
 async def bienvenida_grupo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for member in update.message.new_chat_members:
         if member.id == context.bot.id: continue
-        bienvenida = f"🥳 ¡BIENVENIDO/A, {member.first_name.upper()}! Presentación: Foto, Nombre, Edad y País."
+        
+        texto_bienvenida = (
+            f"🥳 *¡BIENVENIDO/A A LA FAMILIA, {member.first_name.upper()}!* 🥳\n\n"
+            f"{REGLAS_OFICIALES}\n\n"
+            "✨ *¡Queremos conocerte! Envía tu presentación ahora mismo.*"
+        )
         try:
             with open(NOMBRE_FOTO, 'rb') as f:
-                await context.bot.send_photo(chat_id=update.effective_chat.id, photo=f, caption=bienvenida)
+                await context.bot.send_photo(chat_id=update.effective_chat.id, photo=f, caption=texto_bienvenida, parse_mode='Markdown')
         except:
-            await context.bot.send_message(chat_id=update.effective_chat.id, text=bienvenida)
+            await context.bot.send_message(chat_id=update.effective_chat.id, text=texto_bienvenida, parse_mode='Markdown')
 
 # --- 🚀 EJECUCIÓN ---
 
 async def run_bot():
-    # Build sin job_queue para evitar el TypeError de weak reference
+    # Application sin job_queue para evitar el crasheo "weak reference"
     app = ApplicationBuilder().token(TOKEN).build()
     
     app.add_handler(ChatJoinRequestHandler(manejar_solicitud))
@@ -79,19 +88,15 @@ async def run_bot():
     async with app:
         await app.initialize()
         await app.start()
-        print("🤖 Bot iniciado correctamente.")
         await app.updater.start_polling(drop_pending_updates=True)
         while True:
             await asyncio.sleep(3600)
 
 if __name__ == '__main__':
-    # 1. Iniciamos Flask en un hilo separado INMEDIATAMENTE
-    t = threading.Thread(target=run_flask, daemon=True)
-    t.start()
+    # Iniciamos Flask primero para que Render de el "Live" rápido
+    threading.Thread(target=run_flask, daemon=True).start()
     
-    # 2. Iniciamos el bot
     try:
         asyncio.run(run_bot())
     except (KeyboardInterrupt, SystemExit):
         pass
-    
