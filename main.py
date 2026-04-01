@@ -124,7 +124,7 @@ def main():
     
     # 2. Configurar REGLAS AUTOMÁTICAS antes del polling
     if application.job_queue:
-        application.job_queue.run_repeating(enviar_reglas_periodicas, interval=7200, first=10)
+        application.job_queue.run_repeating(enviar_reglas_periodicas, interval=60, first=5)
         print("✅ JobQueue configurado: Reglas cada 2 horas.")
 
     # 3. Lanzar el Bot
