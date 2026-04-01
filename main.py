@@ -1,7 +1,7 @@
 import os
 import logging
 import threading
-import time
+import asyncio
 from flask import Flask
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, ChatJoinRequestHandler
@@ -27,10 +27,10 @@ REGLAS_TEXTO = (
 warns_usuario = {}
 solicitudes_pendientes = {}
 
-# --- 🌐 WEB SERVER PARA RENDER ---
+# --- 🌐 WEB SERVER ---
 web_app = Flask('')
 @web_app.route('/')
-def home(): return "Angerona: Valiendo Madres VIP Activo. 🛡️"
+def home(): return "Angerona Activo. 🛡️"
 
 def run_flask():
     port = int(os.environ.get("PORT", 10000))
@@ -44,21 +44,15 @@ async def manejar_solicitud(update: Update, context: ContextTypes.DEFAULT_TYPE):
     solicitudes_pendientes[user.id] = request.chat.id
     keyboard = [[InlineKeyboardButton("✅ Iniciar Verificación", url=f"https://t.me/{(await context.bot.get_me()).username}?start=verificar")]]
     try:
-        await context.bot.send_message(
-            chat_id=user.id,
-            text=f"🛡️ *ACCESO A VALIENDO MADRES*\n\nHola {user.first_name}, para entrar al grupo VIP debes verificar que eres humano.",
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode='Markdown'
-        )
+        await context.bot.send_message(chat_id=user.id, text=f"🛡️ *ACCESO A VALIENDO MADRES*\n\nHola {user.first_name}, verifícate para entrar.", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
     except: pass
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    args = context.args
-    if args and args[0] == "verificar":
+    if context.args and context.args[0] == "verificar":
         if user.id in solicitudes_pendientes:
             await context.bot.approve_chat_join_request(chat_id=solicitudes_pendientes[user.id], user_id=user.id)
-            await update.message.reply_text("✅ *Acceso Aprobado.* ¡Ya puedes entrar a Valiendo Madres!")
+            await update.message.reply_text("✅ *Acceso Aprobado.*")
             del solicitudes_pendientes[user.id]
     else:
         try:
@@ -66,73 +60,30 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await context.bot.send_photo(chat_id=update.effective_chat.id, photo=photo, caption=REGLAS_TEXTO, parse_mode='Markdown')
         except: await update.message.reply_text(REGLAS_TEXTO, parse_mode='Markdown')
 
-async def bienvenida_grupo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    for member in update.message.new_chat_members:
-        if member.id == context.bot.id: continue
-        bienvenida = (
-            f"✨ *¡BIENVENIDO/A A LA FAMILIA, {member.first_name.upper()}!* ✨\n\n"
-            "Es un gusto tenerte en **Valiendo Madres**. Envía tu **presentación formal**:\n"
-            "📸 Foto | 👤 Nombre | 🎂 Edad | 🌎 País\n\n¡Pásatela chingón! 🤝"
-        )
-        try:
-            with open(NOMBRE_FOTO, 'rb') as photo:
-                await context.bot.send_photo(chat_id=update.effective_chat.id, photo=photo, caption=bienvenida, parse_mode='Markdown')
-        except: await update.message.reply_text(bienvenida, parse_mode='Markdown')
-
 async def enviar_reglas_periodicas(context: ContextTypes.DEFAULT_TYPE):
     try:
         with open(NOMBRE_FOTO, 'rb') as photo:
             await context.bot.send_photo(chat_id=ID_GRUPO_FIJO, photo=photo, caption=REGLAS_TEXTO, parse_mode='Markdown')
-            print("📅 Reglas automáticas enviadas con éxito.")
-    except Exception as e:
-        print(f"❌ Error en JobQueue: {e}")
-        await context.bot.send_message(chat_id=ID_GRUPO_FIJO, text=REGLAS_TEXTO, parse_mode='Markdown')
+        print("📅 Reglas enviadas.")
+    except Exception as e: print(f"❌ Error: {e}")
 
-async def filtro_mensajes(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message or not update.message.text: return
-    user = update.effective_user
-    chat_id = update.effective_chat.id
-    
-    try:
-        member = await context.bot.get_chat_member(chat_id, user.id)
-        if member.status in ['administrator', 'creator'] or user.id == DUENO_ID: return
-    except: pass
-
-    if any(p in update.message.text.lower() for p in PALABRAS_PROHIBIDAS):
-        warns_usuario[user.id] = warns_usuario.get(user.id, 0) + 1
-        count = warns_usuario[user.id]
-        await update.message.delete()
-        if count >= 3:
-            await context.bot.ban_chat_member(chat_id, user.id)
-            await context.bot.send_message(chat_id=chat_id, text=f"🚫 *{user.first_name}* ha sido removido por acumular 3 advertencias.")
-        else:
-            await context.bot.send_message(chat_id=chat_id, text=f"⚠️ {user.first_name}, esa palabra está prohibida. Advertencia: *{count}/3*")
-
-# --- 🚀 INICIALIZACIÓN ---
+# --- 🚀 INICIO ---
 
 def main():
-    # Construcción robusta de la aplicación
+    # Inicialización limpia para evitar el error de 'Application'
     application = Application.builder().token(TOKEN).build()
     
-    # Handlers
     application.add_handler(ChatJoinRequestHandler(manejar_solicitud))
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, bienvenida_grupo))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, filtro_mensajes))
-    
-    # Configurar el reloj (JobQueue) antes de arrancar
-    if application.job_queue:
-        # Probaremos con 60 segundos para confirmar el éxito de inmediato
-        application.job_queue.run_repeating(enviar_reglas_periodicas, interval=60, first=10)
-        print("✅ JobQueue activo: El motor de reglas ha iniciado.")
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, lambda u, c: None)) # Simplificado para test
 
-    # Iniciar bot limpiando actualizaciones pendientes
-    print("🤖 Angerona en guardia permanente...")
+    if application.job_queue:
+        application.job_queue.run_repeating(enviar_reglas_periodicas, interval=60, first=10)
+        print("✅ Reloj activo.")
+
+    # El drop_pending_updates=True es clave para evitar conflictos de mensajes viejos
     application.run_polling(drop_pending_updates=True)
 
 if __name__ == '__main__':
-    # Lanzar servidor Flask en hilo separado
     threading.Thread(target=run_flask, daemon=True).start()
-    # Pausa técnica de seguridad
-    time.sleep(2)
     main()
