@@ -136,3 +136,14 @@ if __name__ == '__main__':
     threading.Thread(target=run_flask, daemon=True).start()
     main()
         
+if __name__ == '__main__':
+    # Forzamos a que Flask corra en el hilo principal y el bot en uno separado
+    # o simplemente iniciamos el bot después de un pequeño delay
+    t = threading.Thread(target=run_flask)
+    t.daemon = True
+    t.start()
+    
+    import time
+    time.sleep(5) # Pausa de seguridad para evitar colisiones al arrancar
+    main()
+        
