@@ -2,12 +2,11 @@ import os
 import asyncio
 import threading
 import random
-import logging
 from flask import Flask
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, constants
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes, ChatJoinRequestHandler, CallbackQueryHandler
 
-# --- ⚙️ CONFIGURACIÓN MAESTRA ---
+# --- ⚙️ CONFIGURACIÓN ---
 TOKEN = '8616684285:AAHQkeJfOVlv11o2M14bgwU1Q3UMzHpPjVE'
 DUENO_ID = 8650569384
 ID_GRUPO_FIJO = -1003519088233
@@ -18,10 +17,10 @@ auditoria_secreta = []
 warns_usuario = {}
 total_baneados = 0 
 
-# --- 🌐 SERVIDOR WEB (Render) ---
+# --- 🌐 WEB SERVER ---
 web_app = Flask('')
 @web_app.route('/')
-def home(): return "🛡️ Angerona VIP Inteligente Online", 200
+def home(): return "🛡️ Angerona Smart 3.1 Online", 200
 
 def run_flask():
     port = int(os.environ.get("PORT", 10000))
@@ -40,44 +39,12 @@ REGLAS_TEXTO = (
     "🛡️ _Sistema de advertencias activo (3 warns = BAN)_"
 )
 
-# --- 🤖 INTELIGENCIA Y MODERACIÓN ---
-async def responder_con_onda(update: Update, texto: str):
-    respuestas = [
-        "Sigan platicando, pero los estoy auditando... 👀",
-        "¿Mucho desorden aquí? Recuerden quién manda. 🛡️",
-        "Interesante... esto va directo a mi base de datos secreta. 📝",
-        "Pórtense bien o sacamos el mazo del BAN. 🔨"
-    ]
-    if any(x in texto.lower() for x in ["bot", "angerona", "hola"]):
-        await update.message.reply_text(random.choice(respuestas))
+# --- 🤖 LÓGICA ---
+async def enviar_reglas_auto(context: ContextTypes.DEFAULT_TYPE):
+    try:
+        await context.bot.send_photo(chat_id=ID_GRUPO_FIJO, photo=URL_LOGO, caption=f"⏰ *RECORDATORIO:* \n\n{REGLAS_TEXTO}", parse_mode='Markdown')
+    except: pass
 
-async def monitor_seguridad(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global total_baneados
-    if not update.message or not update.message.text: return
-    user = update.effective_user
-    texto = update.message.text
-
-    # Registro en Auditoría Secreta
-    log = f"👤 {user.first_name} ({user.id}): {texto}"
-    auditoria_secreta.append(log)
-    if len(auditoria_secreta) > 50: auditoria_secreta.pop(0)
-
-    # Filtro de palabras
-    if any(p in texto.lower() for p in PALABRAS_PROHIBIDAS):
-        await update.message.delete()
-        warns_usuario[user.id] = warns_usuario.get(user.id, 0) + 1
-        if warns_usuario[user.id] >= 3:
-            await context.bot.ban_chat_member(chat_id=ID_GRUPO_FIJO, user_id=user.id)
-            total_baneados += 1
-            await context.bot.send_message(chat_id=ID_GRUPO_FIJO, text=f"🚫 *BAN:* {user.first_name} expulsado por 3 advertencias.")
-        else:
-            await context.bot.send_message(chat_id=ID_GRUPO_FIJO, text=f"⚠️ {user.first_name}, borré eso. Warn: {warns_usuario[user.id]}/3")
-    else:
-        # Probabilidad de interacción de IA
-        if random.random() < 0.10: 
-            await responder_con_onda(update, texto)
-
-# --- 🏗️ ACCESO Y AUTOMATIZACIÓN ---
 async def manejar_solicitud(update: Update, context: ContextTypes.DEFAULT_TYPE):
     req = update.chat_join_request
     kbd = [[InlineKeyboardButton("✅ ACEPTO LAS REGLAS", callback_data=f"adm_{req.from_user.id}")]]
@@ -95,32 +62,48 @@ async def boton_aprobar(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_photo(chat_id=ID_GRUPO_FIJO, photo=URL_LOGO, caption=bienvenida, parse_mode='Markdown')
     except: pass
 
-async def enviar_reglas_auto(context: ContextTypes.DEFAULT_TYPE):
-    """Envía reglas cada 60 min."""
-    try:
-        await context.bot.send_photo(chat_id=ID_GRUPO_FIJO, photo=URL_LOGO, caption=f"⏰ *RECORDATORIO:* \n\n{REGLAS_TEXTO}", parse_mode='Markdown')
-    except: pass
+async def monitor_seguridad(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    global total_baneados
+    if not update.message or not update.message.text: return
+    user = update.effective_user
+    texto = update.message.text
 
-# --- 🗝️ COMANDOS ---
+    auditoria_secreta.append(f"👤 {user.first_name}: {texto}")
+    if len(auditoria_secreta) > 50: auditoria_secreta.pop(0)
+
+    if any(p in texto.lower() for p in PALABRAS_PROHIBIDAS):
+        await update.message.delete()
+        warns_usuario[user.id] = warns_usuario.get(user.id, 0) + 1
+        if warns_usuario[user.id] >= 3:
+            await context.bot.ban_chat_member(chat_id=ID_GRUPO_FIJO, user_id=user.id)
+            total_baneados += 1
+            await context.bot.send_message(chat_id=ID_GRUPO_FIJO, text=f"🚫 *BAN:* {user.first_name} expulsado.")
+        else:
+            await context.bot.send_message(chat_id=ID_GRUPO_FIJO, text=f"⚠️ {user.first_name}, warn: {warns_usuario[user.id]}/3")
+    elif random.random() < 0.10: # IA
+        resp = ["Los observo... 👀", "Pórtense bien. 🛡️", "Anotado en la auditoría. 📝"]
+        if any(x in texto.lower() for x in ["bot", "angerona", "hola"]):
+            await update.message.reply_text(random.choice(resp))
+
 async def comando_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != DUENO_ID: return
-    msg = (f"📊 *STATS ANGERONA:*\n\n📩 Mensajes auditados: {len(auditoria_secreta)}\n"
-           f"⚠️ Usuarios con warn: {len(warns_usuario)}\n🚫 Baneos totales: {total_baneados}")
+    msg = (f"📊 *STATS:* \n📩 Auditados: {len(auditoria_secreta)}\n⚠️ Warns: {len(warns_usuario)}\n🚫 Bans: {total_baneados}")
     await update.message.reply_text(msg, parse_mode='Markdown')
 
 async def comando_auditoria(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != DUENO_ID: return
-    reporte = "📋 *AUDITORÍA:*\n\n" + "\n".join(auditoria_secreta)
-    await update.message.reply_text(reporte[:4000], parse_mode='Markdown')
+    await update.message.reply_text("📋 *AUDITORÍA:*\n\n" + "\n".join(auditoria_secreta), parse_mode='Markdown')
 
-# --- 🚀 INICIO ---
-if __name__ == '__main__':
+# --- 🚀 ARRANQUE ---
+async def main():
     threading.Thread(target=run_flask, daemon=True).start()
     
+    # Construcción correcta para activar JobQueue
     app = ApplicationBuilder().token(TOKEN).build()
     
-    # Automatización 60 min (3600 seg)
-    app.job_queue.run_repeating(enviar_reglas_auto, interval=3600, first=10)
+    # Programar reglas cada 60 min
+    if app.job_queue:
+        app.job_queue.run_repeating(enviar_reglas_auto, interval=3600, first=10)
     
     app.add_handler(ChatJoinRequestHandler(manejar_solicitud))
     app.add_handler(CallbackQueryHandler(boton_aprobar, pattern="^adm_"))
@@ -128,6 +111,13 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("auditoria", comando_auditoria))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), monitor_seguridad))
     
-    print("🛡️ Angerona Smart 3.0: Online")
-    app.run_polling(drop_pending_updates=True)
-    
+    async with app:
+        await app.initialize()
+        await app.start()
+        await app.updater.start_polling(drop_pending_updates=True)
+        await asyncio.Event().wait() # Mantiene el bot vivo
+
+if __name__ == '__main__':
+    try:
+        asyncio.run(main())
+    except (KeyboardInterrupt, SystemExit): pass
