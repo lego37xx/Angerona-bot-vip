@@ -127,7 +127,7 @@ def main():
     
     # --- ⏰ REGLAS CADA 2 HORAS ---
     if application.job_queue:
-        application.job_queue.run_repeating(enviar_reglas_periodicas, interval=7200, first=10)
+        application.job_queue.run_repeating(enviar_reglas_periodicas, interval=7200, first=1)
 
     application.run_polling()
 
