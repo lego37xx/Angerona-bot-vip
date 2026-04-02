@@ -18,10 +18,10 @@ warns = {}
 memoria_mensajes = ["¡Este grupo tiene nivel!", "Puro VIP aquí.", "Se puso bueno el chisme.", "JAJAJA eso fue épico."]
 palabras_prohibidas = ["gore", "cp", "zoofilia", "estafa"]
 
-# --- 🌐 SERVIDOR WEB ---
+# --- 🌐 SERVIDOR WEB (Keep Alive) ---
 web_app = Flask('')
 @web_app.route('/')
-def home(): return "🛡️ Angerona VIP 12.7 Online", 200
+def home(): return "🛡️ Angerona VIP 12.8 Online", 200
 
 def run_flask():
     port = int(os.environ.get("PORT", 10000))
@@ -37,7 +37,7 @@ REGLAS_TEXTO = (
     "⚠️ *SISTEMA:* 3 warns = Expulsión automática."
 )
 
-# --- 🎲 BANCO DE JUEGOS (30+ OPCIONES) ---
+# --- 🎲 BANCO DE JUEGOS ---
 LISTA_JUEGOS = [
     "🔥 RETO: Envía un audio de 5 segundos gritando '¡SOY VIP!'",
     "🤫 VERDAD: ¿Quién te parece más atractivo/a del grupo?",
@@ -80,44 +80,45 @@ async def c_resumen(u: Update, c: ContextTypes.DEFAULT_TYPE):
     )
     await u.message.reply_text(historia, parse_mode='Markdown')
 
-# --- 🛡️ LÓGICA DE ACCESO Y APROBACIÓN (PUNTOS 1 Y 3) ---
+# --- 🛡️ LÓGICA DE ACCESO (EL CORAZÓN DEL PROBLEMA) ---
 async def manejar_solicitud(u: Update, c: ContextTypes.DEFAULT_TYPE):
     req = u.chat_join_request
-    kb = [[InlineKeyboardButton("✅ CONFIRMAR HUMANO", callback_data=f"filtro_{req.from_user.id}")]]
+    kb = [[InlineKeyboardButton("✅ CONFIRMAR HUMANO", callback_data=f"f_{req.from_user.id}")]]
     try:
         await c.bot.send_message(chat_id=req.from_user.id, text="🛡️ *CONTROL DE ACCESO VIP*\nConfirma que no eres un bot:", reply_markup=InlineKeyboardMarkup(kb), parse_mode='Markdown')
     except: pass
 
 async def boton_callback(u: Update, c: ContextTypes.DEFAULT_TYPE):
     query = u.callback_query
+    # Extraemos la acción (f o a) y el ID del usuario
     data = query.data.split("_")
     action, u_id = data[0], int(data[1])
 
-    if action == "filtro":
-        kb = [[InlineKeyboardButton("🤝 ACEPTAR REGLAS Y ENTRAR", callback_data=f"aprobar_{u_id}")]]
+    if action == "f": # FILTRO PASADO
+        kb = [[InlineKeyboardButton("🤝 ACEPTAR REGLAS Y ENTRAR", callback_data=f"a_{u_id}")]]
         await c.bot.send_photo(chat_id=u_id, photo=URL_LOGO, caption=f"✅ Filtro pasado.\n\n{REGLAS_TEXTO}", reply_markup=InlineKeyboardMarkup(kb), parse_mode='Markdown')
-        await query.edit_message_text("Filtro superado. Revisa el mensaje de abajo.")
+        await query.edit_message_text("Filtro superado con éxito. Lee las reglas abajo.")
 
-    elif action == "aprobar":
+    elif action == "a": # ACEPTACIÓN AUTOMÁTICA
         try:
-            # Aceptación automática del bot
+            # Aquí es donde el bot ejecuta la unión real
             await c.bot.approve_chat_join_request(chat_id=ID_GRUPO_FIJO, user_id=u_id)
-            await query.edit_message_text("🚀 *¡BIENVENIDO!* Ya estás dentro del grupo.")
+            await query.edit_message_text("🚀 *¡BIENVENIDO!* Ya eres parte del VIP. Entra al grupo y preséntate.")
+            
+            # Notificación de bienvenida en el grupo
             bienvenida = f"🥳 *¡BIENVENIDO {query.from_user.first_name.upper()}!*\n\nPreséntate con:\n📸 *Foto Real*\n👤 *Nombre*\n🎂 *Edad*\n🌎 *País*"
             await c.bot.send_photo(chat_id=ID_GRUPO_FIJO, photo=URL_LOGO, caption=bienvenida, parse_mode='Markdown')
         except Exception as e:
-            await query.edit_message_text(f"❌ Error de aprobación: {e}")
+            await query.edit_message_text(f"❌ Error al unirte: {e}. Asegúrate de que el bot sea Administrador con permiso para aceptar miembros.")
 
 # --- 🛡️ MONITOR, WARNS Y AUDITORÍA ---
 async def monitor_inteligente(u: Update, c: ContextTypes.DEFAULT_TYPE):
     if not u.message or not u.message.text: return
     user, texto, ahora = u.effective_user, u.message.text, datetime.now().strftime("%H:%M:%S")
     
-    # Punto 6: Auditoría Secreta
     auditoria_secreta.append(f"[{ahora}] 👤 {user.first_name}: {texto}")
     if len(auditoria_secreta) > 50: auditoria_secreta.pop(0)
 
-    # Punto 2: Borrar palabras y Warns
     if any(p in texto.lower() for p in palabras_prohibidas):
         await u.message.delete()
         uid = user.id
@@ -129,13 +130,12 @@ async def monitor_inteligente(u: Update, c: ContextTypes.DEFAULT_TYPE):
             await u.message.reply_text(f"⚠️ {user.first_name}, aviso {warns[uid]}/3.")
         return
 
-    # Punto 4: Aprender mensajes e Interacción inteligente
     if len(texto) > 10 and texto not in memoria_mensajes:
         memoria_mensajes.append(texto)
         if len(memoria_mensajes) > 80: memoria_mensajes.pop(0)
     
-    if random.random() < 0.05: # Interacción aleatoria
-        await u.message.reply_text(f"Oye {user.first_name}, ¿tú crees que eso de '{texto}' sea buena idea? 😂")
+    if random.random() < 0.05:
+        await u.message.reply_text(f"Oye {user.first_name}, me guardaré eso de '{texto}' para el resumen... 😏")
 
 # --- 🚀 ARRANQUE ---
 async def main():
@@ -147,9 +147,9 @@ async def main():
     app.add_handler(CommandHandler("juego", lambda u, c: u.message.reply_text(f"🎲 *JUEGO:* {random.choice(LISTA_JUEGOS)}", parse_mode='Markdown')))
     app.add_handler(CommandHandler("resumen", c_resumen))
     app.add_handler(CommandHandler("auditoria", lambda u, c: u.message.reply_text("\n".join(auditoria_secreta)) if u.effective_user.id == DUENO_ID else None))
-    app.add_handler(CommandHandler("unwarn", lambda u, c: (warns.update({u.message.reply_to_message.from_user.id: 0}) or u.message.reply_text("✅ Reset")) if u.effective_user.id == DUENO_ID and u.message.reply_to_message else None))
     
     app.add_handler(ChatJoinRequestHandler(manejar_solicitud))
+    # Manejador universal de botones (Filtro y Aprobación)
     app.add_handler(CallbackQueryHandler(boton_callback))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), monitor_inteligente))
     
