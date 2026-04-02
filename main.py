@@ -7,7 +7,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, ChatJoinRequestHandler, CallbackQueryHandler
 
 # --- ⚙️ CONFIGURACIÓN ---
-TOKEN = '8616684285:AAHQkeJfOVlv11o2M14bgwU1Q3UMzHpPjVE'
+TOKEN = '8616684285:AAHF7JAV66o2CIOpgUynYMLIyUo-TWX_0AA'
 DUENO_ID = 8650569384 
 ID_GRUPO_FIJO = -1003519088233
 URL_LOGO = "https://raw.githubusercontent.com/lego37xx/Angerona-bot-vip/main/logo.png"
