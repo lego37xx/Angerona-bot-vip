@@ -15,31 +15,34 @@ URL_LOGO = "https://raw.githubusercontent.com/lego37xx/Angerona-bot-vip/main/log
 
 auditoria_secreta = [] 
 warns = {}
-memoria_mensajes = ["¡Este grupo tiene nivel!", "Puro VIP aquí.", "Se puso bueno el chisme.", "JAJAJA eso fue épico."]
+memoria_mensajes = ["¡Este grupo tiene nivel!", "Puro relax aquí.", "Se puso bueno el chisme.", "JAJAJA eso fue épico."]
 palabras_prohibidas = ["gore", "cp", "zoofilia", "estafa"]
 
 # --- 🌐 SERVIDOR WEB ---
 web_app = Flask('')
 @web_app.route('/')
-def home(): return "🛡️ Angerona VIP 13.0 Online", 200
+def home(): return "🛡️ Angerona VIP 13.2 Online", 200
 
 def run_flask():
     port = int(os.environ.get("PORT", 10000))
     web_app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
 
-# --- 📜 REGLAS ---
+# --- 📜 REGLAS OFICIALES (TEXTO IMAGEN) ---
 REGLAS_TEXTO = (
-    "📜🔥 *REGLAS OFICIALES VIP* 🔥📜\n\n"
-    "1️⃣ 🚫 *Prohibido menores de edad.*\n"
-    "2️⃣ 🤝 *Respeto total entre miembros.*\n"
-    "3️⃣ 🚫 *Contenido ilegal = BAN INMEDIATO.*\n"
-    "4️⃣ 📸 *Presentación obligatoria (Foto, Nombre, Edad, País).*\n\n"
-    "⚠️ *SISTEMA:* 3 warns = Expulsión automática."
+    "📜🔥 *REGLAS OFICIALES – “VALIENDO MADRES”* 🔥📜\n\n"
+    "1️⃣ 🚫 *Prohibido menores de edad*\n"
+    "2️⃣ 🤝 *Respeto ante todo*\n"
+    "3️⃣ 📳 *Nada de privados sin permiso*\n"
+    "4️⃣ 🚫 *Cero contenido ilegal o enfermizo*\n"
+    "5️⃣ 😂 *Aquí se viene a convivir*\n"
+    "6️⃣ 🔥 *Se vale picar… pero no pasarse*\n\n"
+    "⚠️ *PRESENTACIÓN OBLIGATORIA:*\n"
+    "Foto, Nombre, Edad y País."
 )
 
-# --- 🎲 BANCO DE JUEGOS (30+ OPCIONES) ---
+# --- 🎲 BANCO DE JUEGOS ---
 LISTA_JUEGOS = [
-    "🔥 RETO: Envía un audio de 5 segundos gritando '¡SOY VIP!'",
+    "🔥 RETO: Envía un audio de 5 segundos gritando '¡VALIENDO MADRES!'",
     "🤫 VERDAD: ¿Quién te parece más atractivo/a del grupo?",
     "🔥 RETO: Cambia tu nombre a 'El Consentido' por 10 minutos.",
     "🤔 VERDAD: ¿Cuál es tu mayor fantasía no cumplida?",
@@ -47,18 +50,16 @@ LISTA_JUEGOS = [
     "🤫 VERDAD: ¿Alguna vez te han pillado en algo prohibido?",
     "🔥 RETO: Di un trabalenguas difícil en nota de voz.",
     "💭 VERDAD: ¿Qué es lo primero que miras en una foto?",
-    "💃 RETO: Describe tu outfit de hoy con solo 3 emojis.",
-    "🍋 RETO: Tómate una selfie fingiendo que muerdes un limón.",
     "🎤 RETO: Canta 10 segundos de tu canción favorita.",
     "😈 RETO: Di algo 'sucio' al oído de un audio de 3 segundos."
-] + [f"🎲 Dinámica: ¡Confiesa un secreto o cumple un castigo sorpresa!" for i in range(18)]
+] + [f"🎲 Dinámica: ¡Confiesa un secreto o cumple un castigo sorpresa!" for i in range(20)]
 
-# --- 🛡️ FUNCIONES DE COMANDO ---
+# --- 🛡️ FUNCIONES ---
 async def post_init(application: Application):
     comandos = [
         BotCommand("start", "🚀 Activar Sistema"),
         BotCommand("juego", "🎲 Verdad o Reto"),
-        BotCommand("reglas", "📜 Publicar Reglas (Admin)"),
+        BotCommand("reglas", "📜 Publicar Reglas"),
         BotCommand("resumen", "📝 El Chisme Narrado"),
         BotCommand("auditoria", "📋 Bitácora (Dueño)")
     ]
@@ -67,8 +68,9 @@ async def post_init(application: Application):
 async def c_start(u: Update, c: ContextTypes.DEFAULT_TYPE):
     try: await u.message.delete()
     except: pass
-    await u.message.reply_text(f"🛡️ *SISTEMA ONLINE*\n\nHola *{u.effective_user.first_name}*, estoy listo. Usa el menú para interactuar.", parse_mode='Markdown')
+    await u.message.reply_text(f"🛡️ *¡SISTEMA ANGERONA ACTIVO!*\n\nHola *{u.effective_user.first_name}*, estoy listo.", parse_mode='Markdown')
 
+# --- 📝 RESUMEN PERSONALIZADO (SIN VIP + CIERRE FIJO) ---
 async def c_resumen(u: Update, c: ContextTypes.DEFAULT_TYPE):
     if len(memoria_mensajes) < 3: return await u.message.reply_text("Poco chisme aún.")
     frases = random.sample(memoria_mensajes, 3)
@@ -76,16 +78,17 @@ async def c_resumen(u: Update, c: ContextTypes.DEFAULT_TYPE):
         f"📖 *LA HISTORIA DEL GRUPO:* \n\n"
         f"Resulta que hoy el grupo amaneció intenso cuando alguien soltó: *'{frases[0]}'* "
         f"y de repente otro respondió que *'{frases[1]}'* "
-        f"mientras todos cerraban con que *'{frases[2]}'*... ¡Este VIP es pura locura! 😂🔥"
+        f"mientras todos cerraban con que *'{frases[2]}'*... "
+        f"\n\n¡Por eso y por más, aquí siempre vale madres! 😂🔥"
     )
     await u.message.reply_text(historia, parse_mode='Markdown')
 
-# --- 🛡️ LÓGICA DE ACCESO (UNIFICADA ESTILO 12.9) ---
+# --- 🛡️ LÓGICA DE ACCESO ---
 async def manejar_solicitud(u: Update, c: ContextTypes.DEFAULT_TYPE):
     req = u.chat_join_request
     kb = [[InlineKeyboardButton("✅ CONFIRMAR HUMANO", callback_data=f"f_{req.from_user.id}")]]
     try:
-        await c.bot.send_message(chat_id=req.from_user.id, text="🛡️ *CONTROL DE ACCESO VIP*\nConfirma que no eres un bot:", reply_markup=InlineKeyboardMarkup(kb), parse_mode='Markdown')
+        await c.bot.send_message(chat_id=req.from_user.id, text="🛡️ *CONTROL DE ACCESO*\nConfirma que no eres un bot:", reply_markup=InlineKeyboardMarkup(kb), parse_mode='Markdown')
     except: pass
 
 async def boton_callback(u: Update, c: ContextTypes.DEFAULT_TYPE):
@@ -93,25 +96,29 @@ async def boton_callback(u: Update, c: ContextTypes.DEFAULT_TYPE):
     data = query.data.split("_")
     action, u_id = data[0], int(data[1])
 
-    if action == "f": # Filtro pasado -> Mostrar reglas
+    if action == "f": 
         kb = [[InlineKeyboardButton("🤝 ACEPTAR REGLAS Y ENTRAR", callback_data=f"a_{u_id}")]]
         await c.bot.send_photo(chat_id=u_id, photo=URL_LOGO, caption=f"✅ Filtro superado.\n\n{REGLAS_TEXTO}", reply_markup=InlineKeyboardMarkup(kb), parse_mode='Markdown')
         await query.answer()
-        await query.edit_message_text("✅ Paso 1: Humano confirmado. Ahora acepta las reglas abajo.")
+        await query.edit_message_text("✅ Paso 1: Humano confirmado. Acepta las reglas abajo.")
 
-    elif action == "a": # Aceptación final -> Aprobar y Bienvenida
+    elif action == "a": 
         try:
             await c.bot.approve_chat_join_request(chat_id=ID_GRUPO_FIJO, user_id=u_id)
-            await query.edit_message_text("🚀 *¡BIENVENIDO!* Ya eres parte del VIP. Entra al grupo y preséntate.")
+            await query.edit_message_text("🚀 *¡BIENVENIDO!* Ya estás dentro. Entra al grupo y preséntate.")
             
-            # BIENVENIDA EN EL GRUPO (Recuperada de la 12.5)
             nombre = query.from_user.first_name
-            bienvenida = f"🥳 *¡BIENVENIDO {nombre.upper()}!*\n\nPreséntate ahora con:\n📸 *Foto Real*\n👤 *Nombre*\n🎂 *Edad*\n🌎 *País*"
+            bienvenida = (
+                f"🥳 *¡BIENVENIDO {nombre.upper()}!*\n\n"
+                f"Ya estás dentro de “VALIENDO MADRES”. Preséntate ahora con:\n\n"
+                f"📸 *Foto Real*\n👤 *Nombre*\n🎂 *Edad*\n🌎 *País*\n\n"
+                f"⚠️ *Evita ser expulsado cumpliendo con tu presentación.*"
+            )
             await c.bot.send_photo(chat_id=ID_GRUPO_FIJO, photo=URL_LOGO, caption=bienvenida, parse_mode='Markdown')
         except Exception as e:
-            await query.edit_message_text(f"❌ Error al unirte: {e}. Asegúrate de que el bot sea Administrador con permiso para añadir miembros.")
+            await query.edit_message_text(f"❌ Error: {e}")
 
-# --- 🛡️ MONITOR, WARNS Y AUDITORÍA (MANTENIDOS) ---
+# --- 🛡️ MONITOR Y AUDITORÍA ---
 async def monitor_inteligente(u: Update, c: ContextTypes.DEFAULT_TYPE):
     if not u.message or not u.message.text: return
     user, texto, ahora = u.effective_user, u.message.text, datetime.now().strftime("%H:%M:%S")
@@ -125,7 +132,6 @@ async def monitor_inteligente(u: Update, c: ContextTypes.DEFAULT_TYPE):
         warns[uid] = warns.get(uid, 0) + 1
         if warns[uid] >= 3:
             await c.bot.ban_chat_member(ID_GRUPO_FIJO, uid)
-            await c.bot.send_message(ID_GRUPO_FIJO, f"🚫 {user.first_name} expulsado por 3 warns.")
         else:
             await u.message.reply_text(f"⚠️ {user.first_name}, aviso {warns[uid]}/3.")
         return
@@ -134,8 +140,8 @@ async def monitor_inteligente(u: Update, c: ContextTypes.DEFAULT_TYPE):
         memoria_mensajes.append(texto)
         if len(memoria_mensajes) > 80: memoria_mensajes.pop(0)
     
-    if random.random() < 0.05: # Interacción aleatoria por nombre
-        await u.message.reply_text(f"Oye {user.first_name}, me guardaré eso de '{texto}' para el chisme de mañana... 😏")
+    if random.random() < 0.05:
+        await u.message.reply_text(f"Oye {user.first_name}, esto va directo al chisme... 😏")
 
 # --- 🚀 ARRANQUE ---
 async def main():
@@ -147,7 +153,6 @@ async def main():
     app.add_handler(CommandHandler("juego", lambda u, c: u.message.reply_text(f"🎲 *JUEGO:* {random.choice(LISTA_JUEGOS)}", parse_mode='Markdown')))
     app.add_handler(CommandHandler("resumen", c_resumen))
     app.add_handler(CommandHandler("auditoria", lambda u, c: u.message.reply_text("\n".join(auditoria_secreta)) if u.effective_user.id == DUENO_ID else None))
-    app.add_handler(CommandHandler("unwarn", lambda u, c: (warns.update({u.message.reply_to_message.from_user.id: 0}) or u.message.reply_text("✅ Reset")) if u.effective_user.id == DUENO_ID and u.message.reply_to_message else None))
     
     app.add_handler(ChatJoinRequestHandler(manejar_solicitud))
     app.add_handler(CallbackQueryHandler(boton_callback))
